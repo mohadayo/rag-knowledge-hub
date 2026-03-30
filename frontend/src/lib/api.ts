@@ -47,6 +47,24 @@ export async function deleteDocument(id: number): Promise<void> {
   if (!res.ok) throw new Error("削除に失敗しました");
 }
 
+export interface FileTypeCount {
+  file_type: string;
+  count: number;
+}
+
+export interface DocumentStats {
+  total_documents: number;
+  total_chunks: number;
+  total_size: number;
+  file_type_breakdown: FileTypeCount[];
+}
+
+export async function fetchDocumentStats(): Promise<DocumentStats> {
+  const res = await fetch(`${API_BASE}/documents/stats`);
+  if (!res.ok) throw new Error("統計情報の取得に失敗しました");
+  return res.json();
+}
+
 export async function sendChat(question: string): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",

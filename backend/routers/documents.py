@@ -2,13 +2,13 @@ import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_db
 from models import Document
-from schemas import DocumentResponse
+from schemas import DocumentResponse, DocumentStats, FileTypeCount
 from services.document_processor import extract_text, split_into_chunks
 from services.embedding_service import generate_embeddings
 from services.vector_store import add_chunks, delete_by_document_id
@@ -86,6 +86,38 @@ async def list_documents(db: AsyncSession = Depends(get_db)):
         select(Document).order_by(Document.uploaded_at.desc())
     )
     return result.scalars().all()
+
+
+@router.get("/stats", response_model=DocumentStats)
+async def document_stats(db: AsyncSession = Depends(get_db)):
+    """文書の統計情報を取得する"""
+    # 全体集計
+    result = await db.execute(
+        select(
+            func.count(Document.id),
+            func.coalesce(func.sum(Document.chunk_count), 0),
+            func.coalesce(func.sum(Document.file_size), 0),
+        ).where(Document.status == "ready")
+    )
+    row = result.one()
+    total_documents, total_chunks, total_size = int(row[0]), int(row[1]), int(row[2])
+
+    # ファイル種別ごとの件数
+    type_result = await db.execute(
+        select(Document.file_type, func.count(Document.id))
+        .where(Document.status == "ready")
+        .group_by(Document.file_type)
+    )
+    file_type_breakdown = [
+        FileTypeCount(file_type=ft, count=cnt) for ft, cnt in type_result.all()
+    ]
+
+    return DocumentStats(
+        total_documents=total_documents,
+        total_chunks=total_chunks,
+        total_size=total_size,
+        file_type_breakdown=file_type_breakdown,
+    )
 
 
 @router.delete("/{document_id}")
