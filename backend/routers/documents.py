@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -6,6 +7,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+
+logger = logging.getLogger(__name__)
+
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 from database import get_db
 from models import Document
 from schemas import DocumentResponse, DocumentStats, FileTypeCount
@@ -33,6 +38,12 @@ async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
 
     file_bytes = await file.read()
     file_size = len(file_bytes)
+
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"ファイルサイズが上限（{MAX_FILE_SIZE // (1024 * 1024)}MB）を超えています",
+        )
 
     # DBにメタデータ保存
     doc = Document(
@@ -72,6 +83,7 @@ async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
         await db.refresh(doc)
 
     except Exception as e:
+        logger.error("文書処理に失敗 (doc_id=%s): %s", doc.id, e, exc_info=True)
         doc.status = "error"
         await db.commit()
         raise HTTPException(status_code=500, detail=f"処理に失敗しました: {str(e)}")
