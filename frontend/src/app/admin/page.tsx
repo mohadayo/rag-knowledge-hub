@@ -3,32 +3,45 @@
 import { useCallback, useEffect, useState } from "react";
 import FileUpload from "@/components/FileUpload";
 import DocumentList from "@/components/DocumentList";
-import { listDocuments, type DocumentInfo } from "@/lib/api";
+import StatsCards from "@/components/StatsCards";
+import {
+  listDocuments,
+  fetchDocumentStats,
+  type DocumentInfo,
+  type DocumentStats,
+} from "@/lib/api";
 
 export default function AdminPage() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
+  const [stats, setStats] = useState<DocumentStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchDocuments = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     try {
-      const docs = await listDocuments();
+      const [docs, s] = await Promise.all([
+        listDocuments(),
+        fetchDocumentStats(),
+      ]);
       setDocuments(docs);
+      setStats(s);
     } catch {
-      console.error("文書一覧の取得に失敗しました");
+      console.error("データの取得に失敗しました");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchDocuments();
-  }, [fetchDocuments]);
+    fetchAll();
+  }, [fetchAll]);
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">文書管理</h1>
 
-      <FileUpload onUploadComplete={fetchDocuments} />
+      {stats && <StatsCards stats={stats} />}
+
+      <FileUpload onUploadComplete={fetchAll} />
 
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h2 className="text-lg font-semibold text-gray-700 mb-4">
@@ -42,7 +55,7 @@ export default function AdminPage() {
             読み込み中...
           </p>
         ) : (
-          <DocumentList documents={documents} onDelete={fetchDocuments} />
+          <DocumentList documents={documents} onDelete={fetchAll} />
         )}
       </div>
     </div>

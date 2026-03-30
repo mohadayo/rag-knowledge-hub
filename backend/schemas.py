@@ -29,3 +29,15 @@ class ChatResponse(BaseModel):
     answer: str
     sources: list[SourceInfo]
     confidence: str  # "high" | "medium" | "low" | "unknown"
+
+
+class FileTypeCount(BaseModel):
+    file_type: str
+    count: int
+
+
+class DocumentStats(BaseModel):
+    total_documents: int
+    total_chunks: int
+    total_size: int
+    file_type_breakdown: list[FileTypeCount]
