@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,11 +7,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import init_db
 from routers import chat, documents
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("アプリケーションを起動中...")
     await init_db()
+    logger.info("データベース初期化完了")
     yield
+    logger.info("アプリケーションをシャットダウン中...")
 
 
 app = FastAPI(

@@ -1,7 +1,11 @@
-from fastapi import APIRouter
+import logging
+
+from fastapi import APIRouter, HTTPException
 
 from schemas import ChatRequest, ChatResponse
 from services.rag_service import ask
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -15,4 +19,11 @@ async def chat(request: ChatRequest):
             sources=[],
             confidence="unknown",
         )
-    return ask(request.question)
+    try:
+        return ask(request.question)
+    except Exception as e:
+        logger.error("チャット処理中にエラーが発生: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail="回答の生成に失敗しました。しばらくしてから再度お試しください。",
+        )
