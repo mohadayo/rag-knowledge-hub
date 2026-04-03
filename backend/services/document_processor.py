@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 import re
 
 import chardet
@@ -7,10 +8,13 @@ import PyPDF2
 
 from config import settings
 
+logger = logging.getLogger(__name__)
+
 
 def extract_text(file_bytes: bytes, filename: str) -> str:
     """ファイルからテキストを抽出する"""
     ext = filename.rsplit(".", 1)[-1].lower()
+    logger.info("テキスト抽出を開始 (filename=%s, ext=%s, size=%d bytes)", filename, ext, len(file_bytes))
 
     if ext == "pdf":
         return _extract_pdf(file_bytes)
@@ -49,6 +53,7 @@ def _extract_text(file_bytes: bytes) -> str:
 
 def split_into_chunks(text: str) -> list[str]:
     """テキストをチャンクに分割する"""
+    logger.info("チャンク分割を開始 (テキスト長=%d文字, chunk_size=%d, overlap=%d)", len(text), settings.chunk_size, settings.chunk_overlap)
     # 空行・改行の正規化
     text = re.sub(r"\n{3,}", "\n\n", text.strip())
 
@@ -82,4 +87,5 @@ def split_into_chunks(text: str) -> list[str]:
     if current_chunk.strip():
         chunks.append(current_chunk.strip())
 
+    logger.info("チャンク分割完了 (チャンク数=%d)", len(chunks))
     return chunks
