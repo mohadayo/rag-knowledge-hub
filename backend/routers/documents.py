@@ -10,7 +10,6 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 from database import get_db
 from models import Document
 from schemas import DocumentResponse, DocumentStats, FileTypeCount
@@ -44,10 +43,10 @@ async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
     file_bytes = await file.read()
     file_size = len(file_bytes)
 
-    if file_size > MAX_FILE_SIZE:
+    if file_size > settings.max_file_size:
         raise HTTPException(
             status_code=400,
-            detail=f"ファイルサイズが上限（{MAX_FILE_SIZE // (1024 * 1024)}MB）を超えています",
+            detail=f"ファイルサイズが上限（{settings.max_file_size // (1024 * 1024)}MB）を超えています",
         )
 
     # DBにメタデータ保存
