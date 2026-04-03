@@ -10,7 +10,6 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 from database import get_db
 from models import Document
 from schemas import DocumentResponse, DocumentStats, FileTypeCount
@@ -29,7 +28,12 @@ async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="ファイル名がありません")
 
-    ext = file.filename.rsplit(".", 1)[-1].lower()
+    # パストラバーサル防止: ファイル名からディレクトリ部分を除去
+    safe_filename = os.path.basename(file.filename)
+    if not safe_filename:
+        raise HTTPException(status_code=400, detail="無効なファイル名です")
+
+    ext = safe_filename.rsplit(".", 1)[-1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
@@ -39,15 +43,15 @@ async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
     file_bytes = await file.read()
     file_size = len(file_bytes)
 
-    if file_size > MAX_FILE_SIZE:
+    if file_size > settings.max_file_size:
         raise HTTPException(
             status_code=400,
-            detail=f"ファイルサイズが上限（{MAX_FILE_SIZE // (1024 * 1024)}MB）を超えています",
+            detail=f"ファイルサイズが上限（{settings.max_file_size // (1024 * 1024)}MB）を超えています",
         )
 
     # DBにメタデータ保存
     doc = Document(
-        filename=file.filename,
+        filename=safe_filename,
         file_type=ext,
         file_size=file_size,
         status="processing",
@@ -60,11 +64,11 @@ async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
         # ファイル保存
         upload_dir = Path(settings.upload_dir)
         upload_dir.mkdir(parents=True, exist_ok=True)
-        file_path = upload_dir / f"{doc.id}_{file.filename}"
+        file_path = upload_dir / f"{doc.id}_{safe_filename}"
         file_path.write_bytes(file_bytes)
 
         # テキスト抽出 → チャンク分割
-        text = extract_text(file_bytes, file.filename)
+        text = extract_text(file_bytes, safe_filename)
         chunks = split_into_chunks(text)
 
         if not chunks:
@@ -74,7 +78,7 @@ async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
         embeddings = generate_embeddings(chunks)
 
         # ベクトルDB保存
-        add_chunks(doc.id, file.filename, chunks, embeddings)
+        add_chunks(doc.id, safe_filename, chunks, embeddings)
 
         # ステータス更新
         doc.chunk_count = len(chunks)
