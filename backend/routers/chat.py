@@ -13,14 +13,14 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """質問に対してRAGで回答する"""
-    if not request.question.strip():
-        return ChatResponse(
-            answer="質問を入力してください。",
-            sources=[],
-            confidence="unknown",
-        )
+    logger.info("チャットリクエスト受信: question_length=%d", len(request.question))
     try:
-        return ask(request.question)
+        result = ask(request.question)
+        logger.info(
+            "チャット応答完了: confidence=%s, sources=%d件",
+            result.confidence, len(result.sources),
+        )
+        return result
     except Exception as e:
         logger.error("チャット処理中にエラーが発生: %s", e, exc_info=True)
         raise HTTPException(
