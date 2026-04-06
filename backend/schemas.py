@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class DocumentResponse(BaseModel):
@@ -17,6 +17,15 @@ class DocumentResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+
+    @field_validator("question")
+    @classmethod
+    def question_must_not_be_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("質問を入力してください")
+        if len(v) > 10000:
+            raise ValueError("質問は10000文字以内で入力してください")
+        return v.strip()
 
 
 class SourceInfo(BaseModel):

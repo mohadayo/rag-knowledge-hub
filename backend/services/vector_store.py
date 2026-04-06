@@ -1,6 +1,10 @@
+import logging
+
 import chromadb
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 _client: chromadb.PersistentClient | None = None
 COLLECTION_NAME = "knowledge_base"
@@ -34,28 +38,44 @@ def add_chunks(
         {"document_id": document_id, "filename": filename, "chunk_index": i}
         for i in range(len(chunks))
     ]
+    logger.info(
+        "ベクトルDB追加開始: document_id=%d, filename=%s, chunks=%d",
+        document_id, filename, len(chunks),
+    )
     collection.add(
         ids=ids,
         documents=chunks,
         embeddings=embeddings,
         metadatas=metadatas,
     )
+    logger.info("ベクトルDB追加完了: document_id=%d, %d件のチャンクを登録", document_id, len(chunks))
 
 
 def search(query_embedding: list[float], n_results: int = 5) -> dict:
     """類似チャンクを検索する"""
     collection = get_collection()
+    total = collection.count()
+
+    if total == 0:
+        logger.info("ベクトル検索スキップ: コレクションが空です")
+        return {"documents": [[]], "metadatas": [[]], "distances": [[]]}
+
+    actual_n = min(n_results, total)
+    logger.info("ベクトル検索開始: n_results=%d, collection_count=%d", actual_n, total)
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=n_results,
+        n_results=actual_n,
         include=["documents", "metadatas", "distances"],
     )
+    hit_count = len(results.get("documents", [[]])[0])
+    logger.info("ベクトル検索完了: %d件ヒット", hit_count)
     return results
 
 
 def delete_by_document_id(document_id: int):
     """指定ドキュメントのチャンクをすべて削除する"""
     collection = get_collection()
+    logger.info("ベクトルDB削除開始: document_id=%d", document_id)
     # ChromaDBではwhere句でフィルタして取得→削除
     results = collection.get(
         where={"document_id": document_id},
@@ -63,3 +83,6 @@ def delete_by_document_id(document_id: int):
     )
     if results["ids"]:
         collection.delete(ids=results["ids"])
+        logger.info("ベクトルDB削除完了: document_id=%d, %d件のチャンクを削除", document_id, len(results["ids"]))
+    else:
+        logger.info("ベクトルDB削除: document_id=%d に該当するチャンクなし", document_id)

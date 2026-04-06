@@ -1,6 +1,10 @@
+import logging
+
 from openai import OpenAI
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 _client: OpenAI | None = None
 
@@ -15,9 +19,14 @@ def _get_client() -> OpenAI:
 def generate_embeddings(texts: list[str]) -> list[list[float]]:
     """テキストリストからEmbeddingを生成する"""
     client = _get_client()
+    logger.info("Embedding生成開始: %d件のテキスト, model=%s", len(texts), settings.openai_embedding_model)
     response = client.embeddings.create(
         model=settings.openai_embedding_model,
         input=texts,
+    )
+    logger.info(
+        "Embedding生成完了: %d件, usage=%d tokens",
+        len(response.data), response.usage.total_tokens,
     )
     return [item.embedding for item in response.data]
 
