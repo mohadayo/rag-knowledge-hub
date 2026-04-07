@@ -7,16 +7,16 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
-
-logger = logging.getLogger(__name__)
-
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 from database import get_db
 from models import Document
 from schemas import DocumentResponse, DocumentStats, FileTypeCount
 from services.document_processor import extract_text, split_into_chunks
 from services.embedding_service import generate_embeddings
 from services.vector_store import add_chunks, delete_by_document_id
+
+logger = logging.getLogger(__name__)
+
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
