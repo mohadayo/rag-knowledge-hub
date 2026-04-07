@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from schemas import ChatRequest, ChatResponse, SourceInfo, DocumentResponse, DocumentStats
+from schemas import ChatRequest, ChatResponse, SourceInfo
 
 
 class TestChatRequest:
