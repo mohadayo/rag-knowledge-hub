@@ -74,7 +74,7 @@ def split_into_chunks(text: str) -> list[str]:
             # 段落自体がchunk_sizeを超える場合は文字数で分割
             if len(para) > chunk_size:
                 for i in range(0, len(para), chunk_size - overlap):
-                    chunks.append(para[i : i + chunk_size].strip())
+                    chunks.append(para[i:i + chunk_size].strip())
                 current_chunk = ""
             else:
                 current_chunk = para

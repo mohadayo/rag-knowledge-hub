@@ -5,13 +5,13 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
-from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
+import pytest  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
 
-from routers.chat import router
-from schemas import ChatResponse, SourceInfo
+from routers.chat import router  # noqa: E402
+from schemas import ChatResponse, SourceInfo  # noqa: E402
 
 
 @pytest.fixture
