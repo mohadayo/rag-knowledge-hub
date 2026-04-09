@@ -3,6 +3,7 @@ import io
 import re
 
 import chardet
+import docx
 import PyPDF2
 
 from config import settings
@@ -14,12 +15,24 @@ def extract_text(file_bytes: bytes, filename: str) -> str:
 
     if ext == "pdf":
         return _extract_pdf(file_bytes)
+    elif ext == "docx":
+        return _extract_docx(file_bytes)
     elif ext == "csv":
         return _extract_csv(file_bytes)
     elif ext in ("txt", "md", "markdown"):
         return _extract_text(file_bytes)
     else:
         raise ValueError(f"未対応のファイル形式です: {ext}")
+
+
+def _extract_docx(file_bytes: bytes) -> str:
+    document = docx.Document(io.BytesIO(file_bytes))
+    texts = []
+    for para in document.paragraphs:
+        text = para.text.strip()
+        if text:
+            texts.append(text)
+    return "\n".join(texts)
 
 
 def _extract_pdf(file_bytes: bytes) -> str:

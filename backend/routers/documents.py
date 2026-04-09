@@ -20,7 +20,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-ALLOWED_EXTENSIONS = {"pdf", "csv", "txt", "md", "markdown"}
+ALLOWED_EXTENSIONS = {"pdf", "docx", "csv", "txt", "md", "markdown"}
 
 
 @router.post("/upload", response_model=DocumentResponse)
