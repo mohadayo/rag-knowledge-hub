@@ -107,7 +107,21 @@ class TestExtractText:
         assert "名前" in result
         assert "田中" in result
 
+    def test_extract_docx_file(self):
+        """docxファイルからテキストを抽出できる"""
+        from docx import Document
+        import io
+        doc = Document()
+        doc.add_paragraph("DOCXテスト文書です。")
+        doc.add_paragraph("2番目の段落です。")
+        buf = io.BytesIO()
+        doc.save(buf)
+        file_bytes = buf.getvalue()
+        result = self.extract_text(file_bytes, "test.docx")
+        assert "DOCXテスト文書" in result
+        assert "2番目の段落" in result
+
     def test_unsupported_extension_raises_error(self):
         """未対応の拡張子はValueErrorを発生させる"""
         with pytest.raises(ValueError, match="未対応"):
-            self.extract_text(b"content", "test.docx")
+            self.extract_text(b"content", "test.xlsx")
