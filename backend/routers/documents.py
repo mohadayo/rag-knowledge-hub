@@ -24,7 +24,11 @@ ALLOWED_EXTENSIONS = {"pdf", "docx", "csv", "txt", "md", "markdown"}
 
 
 @router.post("/upload", response_model=DocumentResponse)
-async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
+async def upload_document(
+    file: UploadFile,
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
     """文書をアップロードし、チャンク分割・Embedding・ベクトルDB保存を行う"""
     if not file.filename:
         raise HTTPException(status_code=400, detail="ファイル名がありません")
@@ -44,6 +48,24 @@ async def upload_document(file: UploadFile, db: AsyncSession = Depends(get_db)):
             status_code=400,
             detail=f"ファイルサイズが上限（{MAX_FILE_SIZE // (1024 * 1024)}MB）を超えています",
         )
+
+    # 重複ドキュメント検知
+    if not force:
+        existing = await db.execute(
+            select(Document).where(
+                Document.filename == file.filename,
+                Document.status == "ready",
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            logger.warning(
+                "重複ドキュメント検知: filename=%s", file.filename,
+            )
+            raise HTTPException(
+                status_code=409,
+                detail=f"同名のファイル '{file.filename}' は既に登録済みです。"
+                "上書きする場合は force=true を指定してください。",
+            )
 
     # DBにメタデータ保存
     doc = Document(
