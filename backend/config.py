@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     chunk_overlap: int = 50
     max_retrieval_results: int = 5
     similarity_threshold: float = 0.3
+    openai_timeout: float = 30.0
+    openai_connect_timeout: float = 10.0
 
     model_config = {"env_file": ".env"}
 
