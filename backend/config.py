@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     chroma_persist_dir: str = "./chroma_data"
     database_url: str = "sqlite+aiosqlite:///./knowledge.db"
     upload_dir: str = "./uploads"
+    max_file_size: int = 10 * 1024 * 1024  # 10MB
     chunk_size: int = 500
     chunk_overlap: int = 50
     max_retrieval_results: int = 5
