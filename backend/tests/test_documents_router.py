@@ -33,6 +33,9 @@ class FakeScalarResult:
     def scalar_one_or_none(self):
         return self._value
 
+    def scalar_one(self):
+        return self._value if self._value is not None else 0
+
     def scalars(self):
         return self
 
@@ -186,7 +189,8 @@ class TestUploadValidation:
         app, _ = create_test_app()
         client = TestClient(app)
 
-        large_content = b"x" * (10 * 1024 * 1024 + 1)
+        from config import settings
+        large_content = b"x" * (settings.max_file_size + 1)
         response = client.post(
             "/api/documents/upload",
             files={"file": ("large.txt", BytesIO(large_content), "text/plain")},
@@ -194,3 +198,43 @@ class TestUploadValidation:
 
         assert response.status_code == 400
         assert "上限" in response.json()["detail"]
+
+
+class TestListDocumentsPagination:
+    """ドキュメント一覧ページネーションのテスト"""
+
+    def test_list_returns_paginated_response(self):
+        """ページネーション形式で一覧を返す"""
+        app, _ = create_test_app()
+        client = TestClient(app)
+
+        response = client.get("/api/documents")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+        assert "offset" in data
+        assert "limit" in data
+        assert data["offset"] == 0
+        assert data["limit"] == 20
+
+    def test_list_with_custom_offset_and_limit(self):
+        """offset/limitパラメータが反映される"""
+        app, _ = create_test_app()
+        client = TestClient(app)
+
+        response = client.get("/api/documents?offset=5&limit=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["offset"] == 5
+        assert data["limit"] == 10
+
+    def test_list_limit_capped_at_100(self):
+        """limitの上限は100"""
+        app, _ = create_test_app()
+        client = TestClient(app)
+
+        response = client.get("/api/documents?limit=200")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["limit"] == 100

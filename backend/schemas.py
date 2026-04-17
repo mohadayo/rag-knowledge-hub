@@ -40,6 +40,13 @@ class ChatResponse(BaseModel):
     confidence: str  # "high" | "medium" | "low" | "unknown"
 
 
+class PaginatedDocumentResponse(BaseModel):
+    items: list[DocumentResponse]
+    total: int
+    offset: int
+    limit: int
+
+
 class FileTypeCount(BaseModel):
     file_type: str
     count: int

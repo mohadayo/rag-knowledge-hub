@@ -9,14 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from database import get_db
 from models import Document
-from schemas import DocumentResponse, DocumentStats, FileTypeCount
+from schemas import DocumentResponse, DocumentStats, FileTypeCount, PaginatedDocumentResponse
 from services.document_processor import extract_text, split_into_chunks
 from services.embedding_service import generate_embeddings
 from services.vector_store import add_chunks, delete_by_document_id
 
 logger = logging.getLogger(__name__)
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -43,10 +42,10 @@ async def upload_document(
     file_bytes = await file.read()
     file_size = len(file_bytes)
 
-    if file_size > MAX_FILE_SIZE:
+    if file_size > settings.max_file_size:
         raise HTTPException(
             status_code=400,
-            detail=f"ファイルサイズが上限（{MAX_FILE_SIZE // (1024 * 1024)}MB）を超えています",
+            detail=f"ファイルサイズが上限（{settings.max_file_size // (1024 * 1024)}MB）を超えています",
         )
 
     # 重複ドキュメント検知
@@ -113,13 +112,35 @@ async def upload_document(
     return doc
 
 
-@router.get("", response_model=list[DocumentResponse])
-async def list_documents(db: AsyncSession = Depends(get_db)):
-    """登録済み文書一覧を取得する"""
+@router.get("", response_model=PaginatedDocumentResponse)
+async def list_documents(
+    offset: int = 0,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+):
+    """登録済み文書一覧を取得する（ページネーション対応）"""
+    if limit > 100:
+        limit = 100
+    if offset < 0:
+        offset = 0
+
+    total_result = await db.execute(select(func.count(Document.id)))
+    total = int(total_result.scalar_one())
+
     result = await db.execute(
-        select(Document).order_by(Document.uploaded_at.desc())
+        select(Document)
+        .order_by(Document.uploaded_at.desc())
+        .offset(offset)
+        .limit(limit)
     )
-    return result.scalars().all()
+    items = result.scalars().all()
+
+    return PaginatedDocumentResponse(
+        items=items,
+        total=total,
+        offset=offset,
+        limit=limit,
+    )
 
 
 @router.get("/stats", response_model=DocumentStats)
