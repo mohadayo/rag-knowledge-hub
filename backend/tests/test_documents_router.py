@@ -238,3 +238,99 @@ class TestListDocumentsPagination:
         assert response.status_code == 200
         data = response.json()
         assert data["limit"] == 100
+
+    def test_list_negative_offset_clamped_to_zero(self):
+        """負のoffsetは0にクランプされる"""
+        app, _ = create_test_app()
+        client = TestClient(app)
+
+        response = client.get("/api/documents?offset=-5")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["offset"] == 0
+
+
+def create_stats_test_app(stats_tuple, type_rows):
+    """統計テスト用アプリケーション生成"""
+    test_app = FastAPI()
+    test_app.include_router(router)
+
+    class StatsDBSession:
+        def __init__(self):
+            self._call_count = 0
+
+        async def execute(self, stmt):
+            self._call_count += 1
+            if self._call_count == 1:
+                return FakeScalarResult(stats_tuple)
+            return FakeScalarResult(type_rows)
+
+    async def override_get_db():
+        yield StatsDBSession()
+
+    from database import get_db
+    test_app.dependency_overrides[get_db] = override_get_db
+
+    return test_app
+
+
+class TestDeleteDocument:
+    """ドキュメント削除のテスト"""
+
+    @patch("routers.documents.delete_by_document_id")
+    def test_delete_existing_document(self, mock_delete_vector):
+        """既存ドキュメントの削除が成功する"""
+        doc = FakeDocument(id=1, filename="test.txt", status="ready")
+        app, _ = create_test_app(existing_doc=doc)
+        client = TestClient(app)
+
+        response = client.delete("/api/documents/1")
+        assert response.status_code == 200
+        data = response.json()
+        assert "削除" in data["message"]
+        mock_delete_vector.assert_called_once_with(1)
+
+    def test_delete_non_existent_document_returns_404(self):
+        """存在しないドキュメントの削除は404を返す"""
+        app, _ = create_test_app(existing_doc=None)
+        client = TestClient(app)
+
+        response = client.delete("/api/documents/999")
+        assert response.status_code == 404
+        assert "見つかりません" in response.json()["detail"]
+
+
+class TestDocumentStats:
+    """統計情報取得のテスト"""
+
+    def test_get_stats_returns_proper_structure(self):
+        """統計情報が正しい構造で返される"""
+        stats_tuple = (5, 100, 50000)
+        type_rows = [("txt", 3), ("pdf", 2)]
+        app = create_stats_test_app(stats_tuple, type_rows)
+        client = TestClient(app)
+
+        response = client.get("/api/documents/stats")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_documents"] == 5
+        assert data["total_chunks"] == 100
+        assert data["total_size"] == 50000
+        assert len(data["file_type_breakdown"]) == 2
+        assert data["file_type_breakdown"][0]["file_type"] == "txt"
+        assert data["file_type_breakdown"][0]["count"] == 3
+
+    def test_get_stats_empty_returns_zeros(self):
+        """ドキュメントが0件の場合、全て0を返す"""
+        stats_tuple = (0, 0, 0)
+        type_rows = []
+        app = create_stats_test_app(stats_tuple, type_rows)
+        client = TestClient(app)
+
+        response = client.get("/api/documents/stats")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_documents"] == 0
+        assert data["total_chunks"] == 0
+        assert data["total_size"] == 0
+        assert data["file_type_breakdown"] == []
