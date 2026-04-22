@@ -1,6 +1,8 @@
 import logging
 import os
-from pathlib import Path
+import re
+import unicodedata
+from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy import func, select
@@ -22,6 +24,17 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 ALLOWED_EXTENSIONS = {"pdf", "docx", "csv", "txt", "md", "markdown"}
 
 
+def sanitize_filename(filename: str) -> str:
+    """ファイル名から危険な文字やパス要素を除去する"""
+    filename = PurePosixPath(filename).name
+    filename = unicodedata.normalize("NFC", filename)
+    filename = re.sub(r'[\x00-\x1f<>:"/\\|?*]', "_", filename)
+    filename = filename.strip(". ")
+    if not filename:
+        filename = "unnamed"
+    return filename
+
+
 @router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
     file: UploadFile,
@@ -32,7 +45,10 @@ async def upload_document(
     if not file.filename:
         raise HTTPException(status_code=400, detail="ファイル名がありません")
 
-    ext = file.filename.rsplit(".", 1)[-1].lower()
+    safe_filename = sanitize_filename(file.filename)
+    logger.info("ファイルアップロード受信: original=%s, sanitized=%s", file.filename, safe_filename)
+
+    ext = safe_filename.rsplit(".", 1)[-1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
@@ -52,23 +68,23 @@ async def upload_document(
     if not force:
         existing = await db.execute(
             select(Document).where(
-                Document.filename == file.filename,
+                Document.filename == safe_filename,
                 Document.status == "ready",
             )
         )
         if existing.scalar_one_or_none() is not None:
             logger.warning(
-                "重複ドキュメント検知: filename=%s", file.filename,
+                "重複ドキュメント検知: filename=%s", safe_filename,
             )
             raise HTTPException(
                 status_code=409,
-                detail=f"同名のファイル '{file.filename}' は既に登録済みです。"
+                detail=f"同名のファイル '{safe_filename}' は既に登録済みです。"
                 "上書きする場合は force=true を指定してください。",
             )
 
     # DBにメタデータ保存
     doc = Document(
-        filename=file.filename,
+        filename=safe_filename,
         file_type=ext,
         file_size=file_size,
         status="processing",
@@ -81,11 +97,11 @@ async def upload_document(
         # ファイル保存
         upload_dir = Path(settings.upload_dir)
         upload_dir.mkdir(parents=True, exist_ok=True)
-        file_path = upload_dir / f"{doc.id}_{file.filename}"
+        file_path = upload_dir / f"{doc.id}_{safe_filename}"
         file_path.write_bytes(file_bytes)
 
         # テキスト抽出 → チャンク分割
-        text = extract_text(file_bytes, file.filename)
+        text = extract_text(file_bytes, safe_filename)
         chunks = split_into_chunks(text)
 
         if not chunks:
@@ -95,7 +111,7 @@ async def upload_document(
         embeddings = generate_embeddings(chunks)
 
         # ベクトルDB保存
-        add_chunks(doc.id, file.filename, chunks, embeddings)
+        add_chunks(doc.id, safe_filename, chunks, embeddings)
 
         # ステータス更新
         doc.chunk_count = len(chunks)
