@@ -89,6 +89,44 @@ def create_test_app(existing_doc=None):
     return test_app, db_session
 
 
+class TestSanitizeFilename:
+    """ファイル名サニタイズのテスト"""
+
+    def test_normal_filename_unchanged(self):
+        from routers.documents import sanitize_filename
+        assert sanitize_filename("report.pdf") == "report.pdf"
+
+    def test_japanese_filename_preserved(self):
+        from routers.documents import sanitize_filename
+        assert sanitize_filename("業務手順書.docx") == "業務手順書.docx"
+
+    def test_path_traversal_removed(self):
+        from routers.documents import sanitize_filename
+        assert sanitize_filename("../../etc/passwd.txt") == "passwd.txt"
+
+    def test_backslash_path_removed(self):
+        from routers.documents import sanitize_filename
+        result = sanitize_filename("C:\\Users\\test\\file.txt")
+        assert ".." not in result
+        assert "\\" not in result
+
+    def test_control_characters_replaced(self):
+        from routers.documents import sanitize_filename
+        result = sanitize_filename("file\x00name.txt")
+        assert "\x00" not in result
+
+    def test_empty_after_strip_returns_unnamed(self):
+        from routers.documents import sanitize_filename
+        assert sanitize_filename("...") == "unnamed"
+
+    def test_special_characters_replaced(self):
+        from routers.documents import sanitize_filename
+        result = sanitize_filename('file<>:"|?*.txt')
+        assert "<" not in result
+        assert ">" not in result
+        assert ":" not in result
+
+
 class TestUploadDuplicateDetection:
     """重複ドキュメント検知のテスト"""
 
