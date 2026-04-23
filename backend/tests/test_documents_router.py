@@ -287,6 +287,48 @@ class TestListDocumentsPagination:
         data = response.json()
         assert data["offset"] == 0
 
+    def test_list_with_search_parameter(self):
+        """searchパラメータ付きでリクエストが正常に処理される"""
+        app, _ = create_test_app()
+        client = TestClient(app)
+
+        response = client.get("/api/documents?search=report")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+
+    def test_list_with_empty_search(self):
+        """空のsearchパラメータでも正常動作する"""
+        app, _ = create_test_app()
+        client = TestClient(app)
+
+        response = client.get("/api/documents?search=")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+
+    def test_list_with_search_and_pagination(self):
+        """searchとページネーションパラメータの併用が正常動作する"""
+        app, _ = create_test_app()
+        client = TestClient(app)
+
+        response = client.get("/api/documents?search=test&offset=0&limit=5")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["offset"] == 0
+        assert data["limit"] == 5
+
+    def test_list_with_whitespace_search(self):
+        """空白のみのsearchパラメータは通常の一覧と同等に動作する"""
+        app, _ = create_test_app()
+        client = TestClient(app)
+
+        response = client.get("/api/documents?search=%20%20")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+
 
 def create_stats_test_app(stats_tuple, type_rows):
     """統計テスト用アプリケーション生成"""
