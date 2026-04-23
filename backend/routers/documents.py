@@ -132,19 +132,28 @@ async def upload_document(
 async def list_documents(
     offset: int = 0,
     limit: int = 20,
+    search: str = "",
     db: AsyncSession = Depends(get_db),
 ):
-    """登録済み文書一覧を取得する（ページネーション対応）"""
+    """登録済み文書一覧を取得する（ページネーション・検索対応）"""
     if limit > 100:
         limit = 100
     if offset < 0:
         offset = 0
 
-    total_result = await db.execute(select(func.count(Document.id)))
+    base_query = select(Document)
+    count_query = select(func.count(Document.id))
+
+    if search.strip():
+        pattern = f"%{search.strip()}%"
+        base_query = base_query.where(Document.filename.ilike(pattern))
+        count_query = count_query.where(Document.filename.ilike(pattern))
+
+    total_result = await db.execute(count_query)
     total = int(total_result.scalar_one())
 
     result = await db.execute(
-        select(Document)
+        base_query
         .order_by(Document.uploaded_at.desc())
         .offset(offset)
         .limit(limit)
