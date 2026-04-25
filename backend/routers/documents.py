@@ -123,7 +123,10 @@ async def upload_document(
         logger.error("文書処理に失敗 (doc_id=%s): %s", doc.id, e, exc_info=True)
         doc.status = "error"
         await db.commit()
-        raise HTTPException(status_code=500, detail=f"処理に失敗しました: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="文書の処理に失敗��ました。ファイルの形式をご確認のうえ再度お試しく���さい。",
+        )
 
     return doc
 
